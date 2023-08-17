@@ -2,7 +2,7 @@
 #include "WorldGrid.h"
 #include "../Actors/Pawns/Player/PC.h"
 #include "Net/UnrealNetwork.h"
-#include "WorldBuilder_PMC.h"
+#include "WorldBuilder.h"
 
 // Sets default values for this component's properties
 AWorldGrid::AWorldGrid()
@@ -37,12 +37,12 @@ void AWorldGrid::InitMap() {
 	for (int y = -tempLoadChunks; y < tempLoadChunks; y++) for (int x = -tempLoadChunks; x < tempLoadChunks; x++) LoadCell(x, y, NULL);
 }
 
-AWorldBuilder_PMC* AWorldGrid::LoadCell(int32 xPos, int32 yPos, APC* pRef) {
+AWorldBuilder* AWorldGrid::LoadCell(int32 xPos, int32 yPos, APC* pRef) {
 	if (FMath::Abs(xPos) > MAP_CHUNKS || FMath::Abs(yPos) > MAP_CHUNKS) return nullptr;
 	int32 sectionId = szudzikPair(xPos, yPos);
-	AWorldBuilder_PMC** gridElem = WorldMap.Find(sectionId);
+	AWorldBuilder** gridElem = WorldMap.Find(sectionId);
 	if (gridElem) {
-		AWorldBuilder_PMC* ref = *gridElem;
+		AWorldBuilder* ref = *gridElem;
 		ref->Players.Emplace(pRef);
 		return *gridElem;
 	}
@@ -50,7 +50,7 @@ AWorldBuilder_PMC* AWorldGrid::LoadCell(int32 xPos, int32 yPos, APC* pRef) {
 		FActorSpawnParameters SpawnInfo;
 		SpawnInfo.Owner = this;
 		// SpawnInfo.Name = FName(FString::Printf(TEXT("w|B%d_%d"), xPos, yPos)); CRASHES when going over a previously left area
-		AWorldBuilder_PMC* Spawned = GetWorld()->SpawnActor<AWorldBuilder_PMC>(WORLD_BUILDER, FVector(xPos * chunkSize, yPos * chunkSize, 0.0f), FRotator(0.0f), SpawnInfo);
+		AWorldBuilder* Spawned = GetWorld()->SpawnActor<AWorldBuilder>(WORLD_BUILDER, FVector(xPos * chunkSize, yPos * chunkSize, 0.0f), FRotator(0.0f), SpawnInfo);
 		//Spawned->SetReplicates(true);
 		//Spawned->bNetLoadOnClient = true;
 		//Spawned->SetReplicateMovement(true);
@@ -64,10 +64,10 @@ AWorldBuilder_PMC* AWorldGrid::LoadCell(int32 xPos, int32 yPos, APC* pRef) {
 
 void AWorldGrid::DestroyCell(int32 xPos, int32 yPos, APC* pRef) {
 	int32 sectionId = szudzikPair(xPos, yPos);
-	AWorldBuilder_PMC** gridElem = WorldMap.Find(sectionId);
+	AWorldBuilder** gridElem = WorldMap.Find(sectionId);
 	if (gridElem)
 	{
-		AWorldBuilder_PMC* ref = *gridElem;
+		AWorldBuilder* ref = *gridElem;
 		//if (collLoc.X > ref->GetActorLocation().X && collLoc.X < ref->GetActorLocation().X + chunkSize && collLoc.Y > ref->GetActorLocation().Y && collLoc.Y < ref->GetActorLocation().Y + chunkSize) return;
 		ref->Players.Remove(pRef);
 		if (ref->Players.Num() == 0) {
@@ -79,9 +79,9 @@ void AWorldGrid::DestroyCell(int32 xPos, int32 yPos, APC* pRef) {
 	}
 }
 
-TArray<AWorldBuilder_PMC*> AWorldGrid::spawnGrid(FVector collLoc, APC* pRef)
+TArray<AWorldBuilder*> AWorldGrid::spawnGrid(FVector collLoc, APC* pRef)
 {
-	TArray<AWorldBuilder_PMC*> newChunks;
+	TArray<AWorldBuilder*> newChunks;
 	int32 chunkX = FMath::Floor(collLoc.X / chunkSize);
 	int32 chunkY = FMath::Floor(collLoc.Y / chunkSize);
 	int32 useX = 0;
@@ -101,9 +101,9 @@ TArray<AWorldBuilder_PMC*> AWorldGrid::spawnGrid(FVector collLoc, APC* pRef)
 	else if (collLoc.Y > chunkSize * (chunkY + 0.99) - width.Y) {
 		useY = 1;
 	}
-	int8 distX = collLoc.X < chunkSize * (chunkX + chunkEdge) ? -1 : 1;
+	int8 distX = collLoc.X < chunkSize* (chunkX + chunkEdge) ? -1 : 1;
 	int8 distY = collLoc.Y < chunkSize* (chunkY + chunkEdge) ? -1 : 1;
-	
+
 	if (useX) newChunks.Add(LoadCell(chunkX + useX, chunkY, pRef));
 	if (useY) newChunks.Add(LoadCell(chunkX, chunkY + useY, pRef));
 	if (useX && useY) newChunks.Add(LoadCell(chunkX + useX, chunkY + useY, pRef));
@@ -143,28 +143,29 @@ FVector2D AWorldGrid::szudzikPair(int32 sectionId)
 	return ((sectionId - sqz) >= sqrtzy) ? FVector2D(sqrtzy - MAP_CHUNKS, (sectionId - sqz - sqrtzy) - MAP_CHUNKS) : FVector2D((sectionId - sqz) - MAP_CHUNKS, sqrtzy - MAP_CHUNKS);
 }
 
-void AWorldGrid::setMaterial(UChunker_PMC* setMesh) {
-	switch (materialIndex) {
+void AWorldGrid::setMaterial(URealtimeMeshSimple* setMesh) {
+	switch (materialIndex)
+	{
 	case 2:
 	case 12:
 	case 22:
-		setMesh->SetMaterial(0, DisplayMaterialInterface);
+		setMesh->SetupMaterialSlot(0, FName("Material Interface"), DisplayMaterialInterface);
 		break;
 	case 3:
 	case 13:
 	case 23:
-		setMesh->SetMaterial(0, DisplayMaterialInstance);
+		setMesh->SetupMaterialSlot(0, FName("Material Instance"), DisplayMaterialInstance);
 		break;
 	case 4:
 	case 14:
 	case 24:
-		setMesh->SetMaterial(0, DisplayMaterialInstanceDynamic);
+		setMesh->SetupMaterialSlot(0, FName("Material Instance Dynamic"), DisplayMaterialInstanceDynamic);
 		break;
 	case 1:
 	case 11:
 	case 21:
 	default:
-		setMesh->SetMaterial(0, DisplayMaterial);
+		setMesh->SetupMaterialSlot(0, FName("Material"), DisplayMaterial);
 		break;
 	}
 }
